@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    username: root
+    password: 1234
+    url: jdbc:mariadb://localhost:3306/amigo_jwt?serverTimezone=UTC&characterEncoding=UTF-8
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    open-in-view: true
+    show-sql: true
