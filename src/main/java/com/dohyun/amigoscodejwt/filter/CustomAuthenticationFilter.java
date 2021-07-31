@@ -2,8 +2,10 @@ package com.dohyun.amigoscodejwt.filter;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.dohyun.amigoscodejwt.util.RequestToJsonUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -34,8 +36,11 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
+        String body = RequestToJsonUtil.readJSONStringFromRequestBody(request);
+        JSONObject json = new JSONObject(body);
+        String username = json.getString("username");
+        String password = json.getString("password");
+
         log.info("[attemptAuthentication] username is : {}, password is : {}", username, password);
 
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username,password);
