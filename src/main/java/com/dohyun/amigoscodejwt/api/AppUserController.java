@@ -9,16 +9,12 @@ import com.dohyun.amigoscodejwt.domain.Role;
 import com.dohyun.amigoscodejwt.service.AppUserService;
 import com.dohyun.amigoscodejwt.util.RedisUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -32,6 +28,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
+@Slf4j
 public class AppUserController {
 
     private final AppUserService appUserService;
@@ -87,7 +84,6 @@ public class AppUserController {
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     new ObjectMapper().writeValue(response.getOutputStream(), tokens);
                 }
-
             } catch (Exception e) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error_message",e.getMessage());
@@ -117,12 +113,10 @@ public class AppUserController {
 
                 // refresh token 삭제
                 if (redisUtil.getData(username) == null) {
-                    throw new Exception("Refresh token is Expired");
+                    log.warn("Refresh token is Expired for username : {}", username);
                 } else {
                     redisUtil.deleteData(username);
                 }
-
-
             } catch (Exception e) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error_message", e.getMessage());
