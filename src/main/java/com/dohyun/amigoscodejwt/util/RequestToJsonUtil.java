@@ -1,14 +1,14 @@
 package com.dohyun.amigoscodejwt.util;
 
+import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 
-@Component
 public class RequestToJsonUtil {
 
-    public static String readJSONStringFromRequestBody(HttpServletRequest request){
+    public static JSONObject readJsonFromRequestBody(HttpServletRequest request){
         StringBuilder json = new StringBuilder();
         String line = null;
 
@@ -21,6 +21,6 @@ public class RequestToJsonUtil {
         }catch(Exception e) {
             System.out.println("Error reading JSON string: " + e.toString());
         }
-        return json.toString();
+        return new JSONObject(json.toString());
     }
 }

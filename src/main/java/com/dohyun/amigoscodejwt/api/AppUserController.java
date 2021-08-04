@@ -7,6 +7,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.dohyun.amigoscodejwt.domain.AppUser;
 import com.dohyun.amigoscodejwt.domain.Role;
 import com.dohyun.amigoscodejwt.service.AppUserService;
+import com.dohyun.amigoscodejwt.util.RedisUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 public class AppUserController {
 
     private final AppUserService appUserService;
+    private final RedisUtil redisUtil;
 
     @GetMapping("/users")
     public ResponseEntity<List<AppUser>> getUsers() {
@@ -52,12 +54,6 @@ public class AppUserController {
         return ResponseEntity.created(uri).body(appUserService.saveRole(role));
     }
 
-    @PostMapping("/role/addtouser")
-    public ResponseEntity<?> saveRole(@RequestBody RoleToUserForm form) {
-        appUserService.addRoleToAppUser(form.getUsername(), form.getRoleName());
-        return ResponseEntity.ok().build();
-    }
-
     @GetMapping("/token/refresh")
     public void refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
@@ -69,25 +65,31 @@ public class AppUserController {
                 DecodedJWT decodedJWT = verifier.verify(refreshToken);
                 String username = decodedJWT.getSubject();
                 AppUser user = appUserService.getUser(username);
+                if (redisUtil.getData(username) == null) {
+                    throw new Exception("Refresh token is Expired");
+                }
+                else if (!redisUtil.getData(username).equals(refreshToken)){
+                    throw new Exception("Refresh token doesn't match");
+                } else {
+                    String accessToken = JWT.create()
+                            .withSubject(user.getUsername())
+                            .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
+                            .withIssuer(request.getRequestURL().toString())
+                            .withClaim("roles",user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                            .sign(algorithm);
 
-                String accessToken = JWT.create()
-                        .withSubject(user.getUsername())
-                        .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
-                        .withIssuer(request.getRequestURL().toString())
-                        .withClaim("roles",user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
-                        .sign(algorithm);
-
-                Map<String, String> tokens = new HashMap<>();
-                tokens.put("access_token",accessToken);
-                tokens.put("refresh_token",refreshToken);
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                new ObjectMapper().writeValue(response.getOutputStream(), tokens);
+                    Map<String, String> tokens = new HashMap<>();
+                    tokens.put("access_token",accessToken);
+                    tokens.put("refresh_token",refreshToken);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    new ObjectMapper().writeValue(response.getOutputStream(), tokens);
+                }
 
             } catch (Exception e) {
-                response.setHeader("Error",e.getMessage());
-                response.setStatus(HttpStatus.FORBIDDEN.value());
                 Map<String, String> error = new HashMap<>();
                 error.put("error_message",e.getMessage());
+
+                response.setStatus(HttpStatus.FORBIDDEN.value());
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 new ObjectMapper().writeValue(response.getOutputStream(), error);
             }
@@ -96,9 +98,39 @@ public class AppUserController {
         }
     }
 
-    @Data
-    static class RoleToUserForm {
-        private String username;
-        private String roleName;
+    @GetMapping("/logout")
+    public void logout(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            try {
+                String accessToken = authorizationHeader.substring("Bearer ".length());
+                Algorithm algorithm = Algorithm.HMAC256("secret".getBytes());
+                JWTVerifier verifier = JWT.require(algorithm).build();
+                DecodedJWT decodedJWT = verifier.verify(accessToken);
+                String username = decodedJWT.getSubject();
+
+                if (redisUtil.getData(username) == null) {
+                    throw new Exception("Refresh token is Expired");
+                } else {
+                    redisUtil.deleteData(username);
+                }
+
+                redisUtil.setDataExpire(accessToken, "blacklist", 10 * 60 * 1000);
+            } catch (Exception e) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error_message", e.getMessage());
+
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                new ObjectMapper().writeValue(response.getOutputStream(), error);
+            }
+        } else {
+                throw new RuntimeException("Access token is missing");
+            }
+    }
+
+    @GetMapping("/test")
+    public ResponseEntity<?> testForAccessToken() {
+        return ResponseEntity.status(HttpStatus.OK).body("진입 성공!");
     }
 }

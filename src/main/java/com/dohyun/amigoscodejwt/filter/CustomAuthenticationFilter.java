@@ -2,10 +2,13 @@ package com.dohyun.amigoscodejwt.filter;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.dohyun.amigoscodejwt.util.RedisUtil;
 import com.dohyun.amigoscodejwt.util.RequestToJsonUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -29,24 +32,36 @@ import java.util.stream.Collectors;
 public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
     private final AuthenticationManager authenticationManager;
-
-    public CustomAuthenticationFilter(AuthenticationManager authenticationManager) {
+    private final RedisUtil redisUtil;
+    
+    public CustomAuthenticationFilter(AuthenticationManager authenticationManager, RedisUtil redisUtil) {
         this.authenticationManager = authenticationManager;
+        this.redisUtil = redisUtil;
     }
 
+    @SneakyThrows
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
-        String body = RequestToJsonUtil.readJSONStringFromRequestBody(request);
-        JSONObject json = new JSONObject(body);
-        String username = json.getString("username");
-        String password = json.getString("password");
+        JSONObject body = RequestToJsonUtil.readJsonFromRequestBody(request);
+        String username = body.getString("username");
+        String password = body.getString("password");
 
         log.info("[attemptAuthentication] username is : {}, password is : {}", username, password);
 
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username,password);
+        try {
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username,password);
+            return authenticationManager.authenticate(authenticationToken);
+        } catch (Exception e) {
+            log.error("[attemptAuthentication] Login failed : {}", e.getMessage());
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        return authenticationManager.authenticate(authenticationToken);
+            Map<String, String> error = new HashMap<>();
+            error.put("error_message",e.getMessage());
+            new ObjectMapper().writeValue(response.getOutputStream(), error);
 
+            return null;
+        }
     }
 
     @Override
@@ -66,6 +81,11 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
                 .withExpiresAt(new Date(System.currentTimeMillis() + 10080 * 60 * 1000))
                 .withIssuer(request.getRequestURL().toString())
                 .sign(algorithm);
+
+        // Refresh token 발급 시 레디스에 { username : token } 으로 저장
+        redisUtil.setDataExpire(user.getUsername(), refreshToken,10080 * 60 * 1000);
+
+        log.info("[successAuthentication] login successfully done");
 
         Map<String, String> tokens = new HashMap<>();
         tokens.put("access_token",accessToken);

@@ -1,7 +1,8 @@
-package com.dohyun.amigoscodejwt.security;
+package com.dohyun.amigoscodejwt.config;
 
 import com.dohyun.amigoscodejwt.filter.CustomAuthenticationFilter;
 import com.dohyun.amigoscodejwt.filter.CustomAuthorizationFilter;
+import com.dohyun.amigoscodejwt.util.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final UserDetailsService userDetailsService;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
+    private final RedisUtil redisUtil;
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
@@ -31,7 +33,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationManagerBean());
+        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationManagerBean(), redisUtil);
         customAuthenticationFilter.setFilterProcessesUrl("/api/login");
 
         http
@@ -45,7 +47,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .anyRequest().authenticated()
                 .and()
                 .addFilter(customAuthenticationFilter)
-                .addFilterBefore(new CustomAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new CustomAuthorizationFilter(redisUtil), UsernamePasswordAuthenticationFilter.class);
     }
 
     @Bean
