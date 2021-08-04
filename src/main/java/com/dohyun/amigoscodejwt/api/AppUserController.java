@@ -65,9 +65,12 @@ public class AppUserController {
                 DecodedJWT decodedJWT = verifier.verify(refreshToken);
                 String username = decodedJWT.getSubject();
                 AppUser user = appUserService.getUser(username);
+
+                // 해당 유저의 refresh token 이 존재하지 않는 경우
                 if (redisUtil.getData(username) == null) {
                     throw new Exception("Refresh token is Expired");
                 }
+                // 해당 유저의 refresh token 과 다른 경우
                 else if (!redisUtil.getData(username).equals(refreshToken)){
                     throw new Exception("Refresh token doesn't match");
                 } else {
@@ -109,13 +112,17 @@ public class AppUserController {
                 DecodedJWT decodedJWT = verifier.verify(accessToken);
                 String username = decodedJWT.getSubject();
 
+                // redis blacklist 에 해당 유저의 access 토큰 추가
+                redisUtil.setDataExpire(accessToken, "blacklist", 10 * 60);
+
+                // refresh token 삭제
                 if (redisUtil.getData(username) == null) {
                     throw new Exception("Refresh token is Expired");
                 } else {
                     redisUtil.deleteData(username);
                 }
 
-                redisUtil.setDataExpire(accessToken, "blacklist", 10 * 60 * 1000);
+
             } catch (Exception e) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error_message", e.getMessage());

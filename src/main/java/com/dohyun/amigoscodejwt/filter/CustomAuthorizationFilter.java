@@ -41,6 +41,8 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 try {
                     String token = authorizationHeader.substring("Bearer ".length());
+
+                    // 로그아웃한 유저인지 check
                     if (redisUtil.getData(token) != null){
                         throw new Exception("User already logged out!");
                     }
