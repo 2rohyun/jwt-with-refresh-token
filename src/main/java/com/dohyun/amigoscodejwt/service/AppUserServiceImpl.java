@@ -39,7 +39,7 @@ public class AppUserServiceImpl implements AppUserService, UserDetailsService {
 
     @Override
     public AppUser saveAppUser(AppUser appUser) {
-        appUser.encryptPassword(passwordEncoder.encode(appUser.getPassword()));
+        appUser.changePassword(passwordEncoder.encode(appUser.getPassword()));
         return appUserRepository.save(appUser);
     }
 

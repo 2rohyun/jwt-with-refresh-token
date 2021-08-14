@@ -20,8 +20,10 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
+import java.rmi.server.ExportException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -63,14 +65,15 @@ public class AppUserController {
                 String username = decodedJWT.getSubject();
                 AppUser user = appUserService.getUser(username);
 
-                // 해당 유저의 refresh token 이 존재하지 않는 경우
-                if (redisUtil.getData(username) == null) {
-                    throw new Exception("Refresh token is Expired");
+                // 해당 유저의 refresh token 이 레디스 내에 없거나 최신 발급 Refresh Token 이 아닐 경우
+                if (redisUtil.getIndexOfList(user.getUsername(), refreshToken) != null && !redisUtil.getRecentDataFromList(user.getUsername()).equals(refreshToken)) {
+                    redisUtil.deleteData(user.getUsername());
+                    throw new Exception("Invalid Refresh token access, Please Login again!");
                 }
-                // 해당 유저의 refresh token 과 다른 경우
-                else if (!redisUtil.getData(username).equals(refreshToken)){
-                    throw new Exception("Refresh token doesn't match");
-                } else {
+                else if (redisUtil.getIndexOfList(user.getUsername(), refreshToken) == null) {
+                    throw new Exception("This is not refresh token or refresh token doesn't exist!");
+                }
+                else {
                     String accessToken = JWT.create()
                             .withSubject(user.getUsername())
                             .withExpiresAt(new Date(System.currentTimeMillis() + 10 * 60 * 1000))
@@ -78,9 +81,18 @@ public class AppUserController {
                             .withClaim("roles",user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
                             .sign(algorithm);
 
+                    String newRefreshToken = JWT.create()
+                            .withSubject(user.getUsername())
+                            .withExpiresAt(new Date(System.currentTimeMillis() + 10080 * 60 * 1000))
+                            .withIssuer(request.getRequestURL().toString())
+                            .withClaim("roles", user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                            .sign(algorithm);
+
+                    redisUtil.addDataFromList(user.getUsername(),newRefreshToken);
+
                     Map<String, String> tokens = new HashMap<>();
                     tokens.put("access_token",accessToken);
-                    tokens.put("refresh_token",refreshToken);
+                    tokens.put("refresh_token",newRefreshToken);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     new ObjectMapper().writeValue(response.getOutputStream(), tokens);
                 }
@@ -112,9 +124,7 @@ public class AppUserController {
                 redisUtil.setDataExpire(accessToken, "blacklist", 10 * 60);
 
                 // refresh token 삭제
-                if (redisUtil.getData(username) == null) {
-                    log.warn("Refresh token is Expired for username : {}", username);
-                } else {
+                if (redisUtil.getRecentDataFromList(username)!= null) {
                     redisUtil.deleteData(username);
                 }
             } catch (Exception e) {

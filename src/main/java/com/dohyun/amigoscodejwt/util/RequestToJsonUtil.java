@@ -11,7 +11,6 @@ public class RequestToJsonUtil {
     public static JSONObject readJsonFromRequestBody(HttpServletRequest request){
         StringBuilder json = new StringBuilder();
         String line = null;
-
         try {
             BufferedReader reader = request.getReader();
             while((line = reader.readLine()) != null) {

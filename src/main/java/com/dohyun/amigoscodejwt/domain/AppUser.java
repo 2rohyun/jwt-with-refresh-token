@@ -1,9 +1,6 @@
 package com.dohyun.amigoscodejwt.domain;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import javax.persistence.*;
@@ -13,7 +10,6 @@ import java.util.List;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
 public class AppUser {
 
     @Id
@@ -29,7 +25,15 @@ public class AppUser {
     @ManyToMany(fetch = FetchType.EAGER)
     private List<Role> roles = new ArrayList<>();
 
-    public void encryptPassword(String password) {
+    public void changePassword(String password) {
         this.password = password;
+    }
+
+    public AppUser(Long id, String name, String username, String password, List<Role> roles) {
+        this.id = id;
+        this.name = name;
+        this.username = username;
+        this.password = password;
+        this.roles = roles;
     }
 }

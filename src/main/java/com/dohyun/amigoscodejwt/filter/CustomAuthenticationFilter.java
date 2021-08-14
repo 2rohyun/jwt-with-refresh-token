@@ -83,7 +83,7 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
                 .sign(algorithm);
 
         // Refresh token 발급 시 레디스에 { username : token } 으로 저장
-        redisUtil.setDataExpire(user.getUsername(), refreshToken,10080 * 60);
+        redisUtil.addDataFromList(user.getUsername(), refreshToken);
 
         log.info("[successAuthentication] login successfully done");
 
