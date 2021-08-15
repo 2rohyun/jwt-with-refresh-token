@@ -65,11 +65,12 @@ public class AppUserController {
                 String username = decodedJWT.getSubject();
                 AppUser user = appUserService.getUser(username);
 
-                // 해당 유저의 refresh token 이 레디스 내에 없거나 최신 발급 Refresh Token 이 아닐 경우
+                // 해당 유저의 예전 refresh token 으로 접근한 경우 모든 refresh token 을 지운다.
                 if (redisUtil.getIndexOfList(user.getUsername(), refreshToken) != null && !redisUtil.getRecentDataFromList(user.getUsername()).equals(refreshToken)) {
                     redisUtil.deleteData(user.getUsername());
                     throw new Exception("Invalid Refresh token access, Please Login again!");
                 }
+                // 레디스에 refresh token 이 없는 경우, refresh token 이 아니거나 이미 로그아웃한 유저이다.
                 else if (redisUtil.getIndexOfList(user.getUsername(), refreshToken) == null) {
                     throw new Exception("This is not refresh token or refresh token doesn't exist!");
                 }
